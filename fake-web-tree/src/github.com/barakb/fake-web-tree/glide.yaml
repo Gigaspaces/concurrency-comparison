@@ -1,0 +1,4 @@
+package: github.com/barakb/fake-web-tree
+import:
+- package: gopkg.in/tylerb/graceful.v1
+  version: ^1.2.13

@@ -1,0 +1,5 @@
+package: github.com/barakb/web-crawler
+import:
+- package: golang.org/x/net
+  subpackages:
+  - html
