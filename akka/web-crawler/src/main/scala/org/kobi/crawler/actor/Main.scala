@@ -14,6 +14,7 @@ import scala.language.postfixOps
   * @since 12.0.1
   */
 object Main extends App{
+  println("Starting main")
   val system = ActorSystem.create("mypool", ConfigFactory.load()
     .getConfig("MyDispatcherExample"))
 

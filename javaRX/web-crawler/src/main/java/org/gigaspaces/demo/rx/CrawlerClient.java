@@ -23,7 +23,7 @@ public class CrawlerClient {
     }
 
     private void onNext(String s) {
-        Logger.log(">>> " + s);
+	//        Logger.log(">>> " + s);
     }
 
     private void onError(Throwable e) {

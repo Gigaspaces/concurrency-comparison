@@ -8,6 +8,7 @@ public class Launcher {
 
     public static void main(String[] args) throws InterruptedException {
         if (args.length != 3) {
+	    System.out.println("args are " + java.util.Arrays.asList(args));
             System.out.println("<Main> <baseUrl> <numOfThreads>");
         }
 

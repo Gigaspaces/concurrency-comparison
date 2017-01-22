@@ -15,7 +15,7 @@ public class CrawlersDemo {
     private static void demoWebCrawler(String url) throws InterruptedException {
         Logger.log("*** Testing WebCrawler with " + url + " ***");
         Crawler crawler = new WebCrawler(url);
-        CrawlerClient crawlerClient = new CrawlerClient(crawler, "/", 4);
+        CrawlerClient crawlerClient = new CrawlerClient(crawler, "/", 20);
         crawlerClient.waitForCompletion();
     }
 
