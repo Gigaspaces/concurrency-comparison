@@ -58,8 +58,6 @@ On my machine the output is:
 
 ```
 
-
-```
 * To benchmark the Akka crawler open shell in the directory `akka/web-crawler` and run `./run.sh`
 On my machine the output is:
 
