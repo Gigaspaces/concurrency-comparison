@@ -63,7 +63,7 @@ On my machine the output is:
 * To benchmark the Akka crawler open shell in the directory `akka/web-crawler` and run `./run.sh`
 On my machine the output is:
 
-```Bas
+```Bash
 
  [org.gigaspaces.demo.CrawlersDemo.main()] *** Testing WebCrawler with http://localhost:8080 ***
  [Crawler-11] Completed - duration = 5001
