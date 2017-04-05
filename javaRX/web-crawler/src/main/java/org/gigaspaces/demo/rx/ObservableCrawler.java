@@ -18,15 +18,15 @@ public class ObservableCrawler {
     private final AtomicInteger pendingTasks = new AtomicInteger();
     private final AtomicInteger threadIdGenerator = new AtomicInteger();
 
-    public static Observable<String> create(Crawler crawler, String seed, int numOfThreads) {
+    public static Observable<String> create(Crawler crawler, String url, int numOfThreads) {
         ObservableCrawler o = new ObservableCrawler(crawler, numOfThreads);
         return Observable.create(subscriber -> {
             o.subscriber = subscriber;
             if (o.executorService == null) {
-                o.process(seed);
+                o.process(url);
                 subscriber.onCompleted();
             } else {
-                o.processAsync(seed);
+                o.processAsync(url);
             }
         });
     }

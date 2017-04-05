@@ -28,7 +28,7 @@ public class WebCrawler implements Crawler {
         Elements re = doc.select("a");
         for (Element element : re) {
             String link = element.attributes().get("href");
-            consumer.accept(link);
+            consumer.accept(link); // call to ObservableCrawler.processAsync
         }
     }
 

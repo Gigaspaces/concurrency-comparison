@@ -5,6 +5,7 @@ import org.gigaspaces.demo.utils.Logger;
 import rx.Observable;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class CrawlerClient {
 
@@ -33,7 +34,7 @@ public class CrawlerClient {
 
     private void onCompleted() {
         complete();
-        Logger.log("Completed - duration = " + (completeTime - startTime));
+        Logger.log("Completed - duration = " + (double) (completeTime - startTime) / 1000 + "s");
     }
 
     private void complete() {
