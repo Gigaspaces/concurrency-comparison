@@ -45,11 +45,11 @@ func servTree(w http.ResponseWriter, r *http.Request) {
 
 func getRequestedNode(url string) (int, error) {
 	if url == "/index.html" {
-		return 1, nil
+		return 0, nil
 	} else if match := re.FindStringSubmatch(url); 1 < len(match) {
 		return strconv.Atoi(match[1])
 	} else {
-		return 1, nil
+		return 0, nil
 	}
 }
 

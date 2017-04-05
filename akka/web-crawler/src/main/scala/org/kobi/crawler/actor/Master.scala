@@ -1,38 +1,54 @@
 package org.kobi.crawler.actor
 
-import java.util.concurrent.{ConcurrentHashMap, CountDownLatch}
+import java.util.Calendar
 
-import akka.actor.{Actor, ActorSystem, Props}
-import akka.routing.RoundRobinPool
+import akka.actor.{Actor, ActorRef, Props}
+import akka.event.Logging
+import org.kobi.crawler.actor.Master.{Start, Stop, UpdateState}
+import org.kobi.crawler.actor.Parser.Parse
 
-/**
-  * Created by kobikis on 20/11/16.
-  *
-  * @since 12.0.1
-  */
-class Master(system: ActorSystem) extends Actor {
+import scala.collection.mutable
 
 
-  var visitedLinks: ConcurrentHashMap[Url, Boolean] = new ConcurrentHashMap[Url, Boolean]()
-  var counter: CountDownLatch = new CountDownLatch((math.pow(2,17) - 1)##)
+class Master extends Actor {
 
-  val parser = system.actorOf(Props(new Parser(self, counter)).withRouter(new RoundRobinPool(4)).withDispatcher("defaultDispatcher"))
+  val log = Logging(context.system, this)
+  var visiting: mutable.Map[Url, Boolean] = mutable.Map[Url, Boolean]()
+  var visited: mutable.Map[Url, Boolean] = mutable.Map[Url, Boolean]()
+  val parser: ActorRef = context.actorOf(Parser.props)
+
+  def currentTime: Int = Calendar.getInstance().get(Calendar.MILLISECOND)
 
   override def receive: Receive = {
-    case Start(url : Url) =>
-      visitedLinks.put(url, true)
+    case Start(url: Url) =>
+      log.info("starting with url: " + url)
+      visiting += (url -> true)
       parser ! Parse(url)
 
-    case urls: List[Url] =>
-      for(url <- urls) {
-        if (!visitedLinks.containsKey(url)) {
-          parser ! Parse(url)
+    case UpdateState(sourceUrl: Url, urls: List[Url]) =>
+      urls.foreach(link => {
+        if (!visiting.contains(link) && !visited.contains(link)) {
+          parser ! Parse(link)
+          visiting = visiting += (link -> true)
         }
-        visitedLinks .put(url, true)
-      }
+      })
+      visiting -= sourceUrl
+      visited += sourceUrl -> true
+      if (visiting.isEmpty) self ! Stop
 
     case Stop =>
-//      println("counter = " + counter.getCount)
-      system.terminate()
+      log.info("stopping, processed " + visited.size + " links")
+      context.system.terminate()
   }
+}
+
+object Master {
+  def props: Props = Props[Master].withDispatcher("fixedDispatcher1")
+
+  case object Stop
+
+  case class UpdateState(sourceUrl: Url, urls: List[Url])
+
+  case class Start(url: Url)
+
 }

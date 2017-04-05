@@ -44,7 +44,6 @@ func Extract(url string) ([]string, error) {
 	return links, nil
 }
 
-
 func forEachNode(n *html.Node, pre, post func(n *html.Node)) {
 	if pre != nil {
 		pre(n)
