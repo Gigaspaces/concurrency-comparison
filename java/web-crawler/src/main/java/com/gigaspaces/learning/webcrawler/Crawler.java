@@ -1,5 +1,4 @@
-package com.gigaspaces.learning.webcrawler.v1;
-
+package com.gigaspaces.learning.webcrawler;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -13,64 +12,70 @@ import org.jsoup.select.Elements;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Yohana Khoury
+ * @since 12.1
  */
-public class App {
-    private final String baseUrl;
-    private final Set<String> seen;
-    private final ExecutorService executorService;
-    private final BlockingQueue<List<String>> queue;
+public class Crawler {
     private final CloseableHttpClient client;
+    private final String baseUrl;
+    private final ExecutorService executorService;
+    private Object lock = new Object();
+    private ConcurrentHashMap<String, Boolean> seen = new ConcurrentHashMap<String, Boolean>();
+    private AtomicInteger pending = new AtomicInteger(0);
 
-
-    public App(String baseUrl, int numOfThreads) {
+    public Crawler(String baseUrl, int numOfThreads) {
+        this.client = HttpClientBuilder.create().build();
+        this.baseUrl = baseUrl;
         this.executorService = Executors.newFixedThreadPool(numOfThreads, new ThreadFactory() {
             public Thread newThread(Runnable r) {
                 return new Thread(r, "Crawler-Worker");
             }
         });
-        this.baseUrl = baseUrl;
-        this.seen = new HashSet<String>();
-        this.queue = new LinkedBlockingDeque<List<String>>();
-        this.client = HttpClientBuilder.create().build();
     }
 
-    public void start() throws InterruptedException {
-        int n = 0;
-        queue.add(Arrays.asList("/"));
-        n++;
-        for (; n > 0; n--) {
-            final List<String> links = queue.take();
-            for (final String link : links) {
-                if (seen.contains(link)) {
-                    continue;
+    public int getSeenLinks() {
+        return seen.size();
+    }
+
+    private void handle(final String link) {
+        if (seen.containsKey(link))
+            return;
+        seen.put(link, true);
+        pending.incrementAndGet();
+        executorService.execute(new Runnable() {
+            public void run() {
+                List<String> links = getLinksFromUrl(link);
+                for (String link : links) {
+                    handle(link);
                 }
-                seen.add(link);
-                n++;
-                executorService.execute(new Runnable() {
-                    public void run() {
-                        queue.add(getLinksFromUrl(link));
+                pending.decrementAndGet();
+                if (pending.get() == 0) {
+                    synchronized (lock) {
+                        lock.notify();
                     }
-                });
+                }
             }
-        }
+        });
     }
 
-    public List<String> getLinksFromUrl(final String url) {
+    private List<String> getLinksFromUrl(final String url) {
         Document doc = Jsoup.parse(getDataFromUrl(baseUrl + url));
         Elements re = doc.select("a");
         ArrayList<String> list = new ArrayList<String>(re.size());
         for (Element element : re) {
-            list.add(element.attributes().get("href"));
+            String link = element.attributes().get("href");
+            list.add(link);
         }
         return list;
     }
 
-    public String getDataFromUrl(String url) {
+    private String getDataFromUrl(String url) {
         BufferedReader rd = null;
         try {
             HttpGet request = new HttpGet(url);
@@ -95,24 +100,34 @@ public class App {
         }
     }
 
+    public void start() {
+        handle(baseUrl);
+    }
 
-    public int getProcessedLinks() {
-        return seen.size();
+    public void join() {
+        synchronized (this.lock) {
+            try {
+                this.lock.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void shutdown() {
-        try {
-            executorService.shutdown();
-            executorService.awaitTermination(5, TimeUnit.MINUTES);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
         if (client != null) {
             try {
                 client.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(5, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }

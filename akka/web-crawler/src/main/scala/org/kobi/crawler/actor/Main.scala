@@ -1,27 +1,20 @@
 package org.kobi.crawler.actor
 
-import akka.actor.{ActorSystem, Props}
-import akka.routing.RoundRobinPool
+import akka.actor.{ActorSystem}
 import com.typesafe.config.ConfigFactory
+import org.kobi.crawler.actor.Master.Start
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-/**
-  * Created by kobikis on 20/11/16.
-  *
-  * @since 12.0.1
-  */
-object Main extends App{
-  println("Starting main")
-  val system = ActorSystem.create("mypool", ConfigFactory.load()
-    .getConfig("MyDispatcherExample"))
+object Main extends App {
+  val system = ActorSystem.create("mypool", ConfigFactory.load().getConfig("MyDispatcherExample"))
 
-  val master = system.actorOf(Props(new Master(system)).withRouter(new RoundRobinPool(4)).withDispatcher("defaultDispatcher"))
+  val master = system.actorOf(Master.props)
 
   time {
-    master ! Start(new Url("http://localhost:8080/"))
+    master ! Start(Url("http://localhost:8080/index.html"))
     Await.result(system.whenTerminated, 10 minutes)
   }
 

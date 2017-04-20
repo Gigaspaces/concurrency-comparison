@@ -1,28 +1,24 @@
 package org.kobi.crawler.actor
 
-import java.util.concurrent.CountDownLatch
-
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, Props}
+import akka.event.Logging
+import akka.routing.{RoundRobinPool, SmallestMailboxPool, SmallestMailboxRoutingLogic}
 import org.jsoup.Jsoup
+import org.kobi.crawler.actor.Master.UpdateState
+import org.kobi.crawler.actor.Parser.Parse
 
 import scala.collection.JavaConverters._
 import scala.language.postfixOps
 
 
-class Parser(manager: ActorRef, counter: CountDownLatch) extends Actor {
+class Parser extends Actor {
   val baseUrl = "http://localhost:8080"
+  val log = Logging(context.system, this)
 
   def receive: Receive = {
     case Parse(url) =>
-//      println("Parsing " + url)
-      if(counter.getCount == 0) {
-        sender() ! Stop
-      }
-      else {
-        val links = getLinks(url)
-        links.foreach(url => counter.countDown())
-        sender() ! links
-      }
+      val links = getLinks(url)
+      sender() ! UpdateState(url, links)
   }
 
   def getLinks(url: Url): List[Url] = {
@@ -31,8 +27,13 @@ class Parser(manager: ActorRef, counter: CountDownLatch) extends Actor {
     doc.getElementsByTag("a")
       .asScala
       .map(e => e.attr("href"))
-      .map(link => new Url(baseUrl + link))
+      .map(link => Url(baseUrl + link))
       .toList
   }
 
+}
+
+object Parser {
+  def props: Props = Props[Parser].withDispatcher("fixedDispatcher20").withRouter(new SmallestMailboxPool(20))
+  case class Parse(url: Url)
 }
