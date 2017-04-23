@@ -8,57 +8,55 @@ var inProcessRequests = 0;
 var pendingUrls = []
 
 
-function visit(url, k) {
+function visit(url, k){
     inProcessRequests +=1
     http.get({
         host: 'localhost',
         port: 8080,
         path: url
-    }, function (response) {
-        parse(url, response, k)
+    }, function(response) {
+	parse(url, response, k)
     });
 }
 
-function parse(url, response, k) {
-    if (visitedUrls.has(url)) {
-        inProcessRequests -= 1;
-        k([]);
+function parse(url, response, k){
+    if( visitedUrls.has(url) ){
+	inProcessRequests -= 1;
+	k([]);
         return
     }
     visitedUrls.add(url)
     var body = '';
-    response.on('data', function (chunk) {
+    response.on('data', function(chunk) {
         body += chunk;
     });
-    response.on('end', function () {
+    response.on('end', function() {
 	var links = []
         var linkElements = cheerio.load(body)('a')
         for (var index = 0; index < linkElements.length; index++) {
             var href = linkElements[index].attribs.href
-            if (!visitedUrls.has(href)) {
+            if( !visitedUrls.has(href) ){
                 links.push(href)
             }
         }
-        inProcessRequests -= 1;
-        k(links)
+	inProcessRequests -= 1;
+	k(links)
     });
 }
 
-function kontinue(links) {
+function kontinue(links){    
     Array.prototype.push.apply(pendingUrls, links);
-    process.nextTick(function () {
-        while ((0 < pendingUrls.length) && (inProcessRequests < maxInProcessRequests)) {
-            url = pendingUrls.pop();
-            visit(url, kontinue);
-        }
+    process.nextTick(function(){
+	while ((0 < pendingUrls.length) && (inProcessRequests < maxInProcessRequests)){
+	    url = pendingUrls.pop();
+	    visit(url, kontinue);
+	}
     });
-    if (pendingUrls.length == 0 && inProcessRequests == 0) {
-        console.info("Done visitedUrls:", visitedUrls.size, "took:", Date.now() - startTime, "milliseconds");
+    if (pendingUrls.length == 0 && inProcessRequests == 0){
+	console.info("Done visitedUrls:", visitedUrls.size , "took:", Date.now() - startTime, "milliseconds");
     }
 }
 
 var startTime = Date.now()
 
-console.info("Starting with url: http://localhost:8080, maxInProcessRequests = ", maxInProcessRequests);
-
-visit("/0/index.html", kontinue);
+visit("/0/index.html", kontinue)

@@ -25,7 +25,7 @@ public class Crawler {
     private final CloseableHttpClient client;
     private final String baseUrl;
     private final ExecutorService executorService;
-    private Object lock = new Object();
+    private final Object lock = new Object();
     private ConcurrentHashMap<String, Boolean> seen = new ConcurrentHashMap<String, Boolean>();
     private AtomicInteger pending = new AtomicInteger(0);
 

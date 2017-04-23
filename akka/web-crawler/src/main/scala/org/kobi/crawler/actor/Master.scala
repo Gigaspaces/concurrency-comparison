@@ -29,7 +29,7 @@ class Master extends Actor {
       urls.foreach(link => {
         if (!visiting.contains(link) && !visited.contains(link)) {
           parser ! Parse(link)
-          visiting = visiting += (link -> false)
+          visiting = visiting += (link -> true)
         }
       })
       visiting -= sourceUrl
