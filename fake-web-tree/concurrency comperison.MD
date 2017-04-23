@@ -343,7 +343,7 @@ threaded and there for cannot compete with the other implementation who utilize 
 the parsing tasks simultaneously. However, in contrast to thread-based networking which are very difficult to use, Node 
 frees you from worries of dead-locks - there are no locks.
 
-## The AKKA Implementation
+## The Akka Implementation
 The Akka approach to handling concurrency is based on the Actor Model, the basics of this model is that every actor has 
 its own private mutable state that is unreachable from the outside and actors can influence each other only by sending 
 massages. This approach relieves us from managing and protecting a shared state between different entities in our system.
@@ -457,22 +457,42 @@ object Main extends App {
         [INFO] [04/23/2017 11:27:58.721] [mypool-fixedDispatcher1-6] [akka://mypool/user/$a] stopping, processed 65537 links
         Elapsed time: 7586ms
 
-The AKKA implementation performs as good as the java implementations.
+The Akka implementation performs as good as the java implementations.
 The actors way of coding is a very simple approach to implement concurrent lock free application of any size, the level 
 of abstraction is very good as the concurrency configuration is completely decoupled from the logic and scaling is 
 done with ease.
 
 ## Bottom Line:
 
-| Implementations | Multi-Core Utilization | Abstraction Level | Easy To Master | Location Transparency | Readability |
-| -------------   |:----------------------:|:----------------: |:--------------:|:---------------------:|:-----------:|
-| Basic java      |        Yes             |     Low           |        No      |    No                 |      Low    |
-| RxJava          |        Yes             |     Medium        |        No      |    No                 |      Low    |      
-| Go              |        Yes             |                   |                |                       |             |         
-| Node.js         |                        |                   |                |                       |             |
-| AKKA            |                        |                   |                |                       |             |
-
 ![final comperison](images/performanceDiagram.png)
+
+From the above results it is evident the go implementation performs the best for our use case, how ever there other things
+to consider when developing a concurrent application. 
+
+| Implementations | Multi-Core Utilization | Abstraction Level | Easy To Master | Readability | Additional Features |
+| -------------   |:----------------------:|:----------------: |:--------------:|:-----------:|:-------------------:|
+| Basic java      |        Yes             |     Low           |      Hard      |     Low     |                     |
+| RxJava          |        Yes             |     Medium        |      Hard      |     Low     |                     |      
+| Go              |        Yes             |     High          |      Medium    |     Medium  |Hardware independent |         
+| Node.js         |        No              |     High          |      Easy      |     Medium  |                     |
+| Akka            |        Yes             |     High          |      Medium    |     High    |Location Transparency|
+
+While the java based implementations have good performance when you
+are developing a big system the complexity of shared local states and synchronization is hard to maintain and scaling your
+application through multiple computers is any thing but trivial.
+In go yo can write your code regardless of what resources will be available on the machine that will run it since go 
+adjusts your program thread to the OS threads in a transparent way, also the go goroutines have stacks that can grow thus 
+not waisting memory on big unnecessary initial fixed size stacks like in java.
+Akka has a complete separation between the business logic and the concurrency implementation and therefor you can run the
+exact same code on single or multiple threads, akka also let you run your code on several computers with minor changes
+to your implementation.
+
+Hope you have enjoyed our review and found some new things to sink your teeth into next time you go about writing a new
+concurrent application. 
+
+
+
+
 
 
 
