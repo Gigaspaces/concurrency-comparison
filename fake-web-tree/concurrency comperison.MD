@@ -3,14 +3,25 @@
    <https://github.com/Gigaspaces/concurrency-comparison>
 
 ## Motivation
-Here at Gigaspaces we put a lot of thought and afford to make sure our entire r&d team produces professional and 
-efficient code. By the nature of our distributed product the code , more often the not, needs to be concurrent. So to 
+Here at Gigaspaces we put a lot of thought and afford to make sure our entire R&D team produces professional and 
+efficient code. By the nature of our distributed product the code, more often than not, needs to be concurrent. So to 
 keep up with all things concurrent and scalable we decided to write the same app in a variety of programming languages 
 and frameworks so we can compare and contrast the different implementations.
 
-The program we chose is a web crawler, its purpose is to traverse an html page and for every link (href) in the page, 
-fetch the page, traverse it and so on. The most potentially time consuming part of the execution is the remote http
-request and that is why this is the part we are paralleling.
+Here are criteria that we choose to consider:
+
+ * Multi-Core Utilization -- does the technology support Multi-Core Utilization without changing the program ? 
+ * Abstraction Level -- _todo_
+ * Easy To Master -- How much time does it take to learn this technology ?
+ * Readability -- Does it easy to read others code? does it easy to read my code after a year ? 
+ * Performance.
+ * Additional Features -- Other goodies provided by this technology that does not fall into on of the above.
+
+
+The program we chose to use as the comparator is a web crawler, its purpose is to traverse an html pages hierarchy and for every link (href) in a page, 
+fetch the page, extract its link and process them. The most potentially time consuming part of the execution is the remote http
+request and the parsing of the page and that is why this is the part we are paralleling.
+We execute each tests with parallelism level set to 1, 10 and 20.   
 
 ## The Testing Tool
 In order to test the results of each implementation we created the fake web tree - a go web server that generates a tree
@@ -32,31 +43,44 @@ used to keep track of how many urls are being visited and the ‘seen’ set is 
 
 ```java
 public class Crawler {
-private ConcurrentHashMap<String, Boolean> seen = new ConcurrentHashMap<String, Boolean>();
-private AtomicInteger pending = new AtomicInteger(0);    
-public void start() {
-    handle(baseUrl);
-}
-private void handle(final String link) {        
-   if (seen.containsKey(link))
-       return;
-   seen.put(link, true);
-   pending.incrementAndGet();
-   executorService.execute(new Runnable() {
-       public void run() {
-           List<String> links = getLinksFromUrl(link);
-           for (String link : links) {
-               handle(link);
-           }
-           pending.decrementAndGet();
-           if (pending.get() == 0) {
-               synchronized (lock) {
-                   lock.notify();
+
+    private ConcurrentHashMap<String, Boolean> seen = new ConcurrentHashMap<String, Boolean>();
+    private AtomicInteger pending = new AtomicInteger(0);
+    
+    public Crawler(String baseUrl, int numOfThreads) {
+        this.client = HttpClientBuilder.create().build();
+        this.baseUrl = baseUrl;
+        this.executorService = Executors.newFixedThreadPool(numOfThreads, new ThreadFactory() {
+           public Thread newThread(Runnable r) {
+               return new Thread(r, "Crawler-Worker");
+            }
+        });
+    }
+    
+    public void start() {
+        handle(baseUrl);
+    }
+    
+    private void handle(final String link) {        
+       if (seen.containsKey(link))
+           return;
+       seen.put(link, true);
+       pending.incrementAndGet();
+       executorService.execute(new Runnable() {
+           public void run() {
+               List<String> links = getLinksFromUrl(link);
+               for (String link : links) {
+                   handle(link);
+               }
+               pending.decrementAndGet();
+               if (pending.get() == 0) {
+                   synchronized (lock) {
+                       lock.notify();
+                   }
                }
            }
-       }
-   });
-}
+       });
+    }
 }
 public class Main{
 public static void main(String[] args) throws InterruptedException {
@@ -85,6 +109,9 @@ The java implementation is straightforward and dose not involve learning any new
 We have to use ConcurrentHashMap and AtomicInteger to avoid race conditions and to use a lock and synchronized blocks in
 order to write concurrent, thread safe code and every time we explicitly write synchronize pieces of code the chances of
 bugs increases.
+Java map java thread directly to OS thread.
+The parallelism level in this program determined by the number of threads in the `ExecutorService`.
+  
 
 ## The RxJava implementation
 RxJava is a Java implementation of ReactiveX, A library for composing asynchronous and event-based programs by using 
@@ -113,6 +140,7 @@ for every such url.
 ```java
 public class ObservableCrawler {
    private Subscriber<? super String> subscriber;
+   
    public static Observable<String> create(Crawler crawler, String url, int numOfThreads) {
        ObservableCrawler o = new ObservableCrawler(crawler, numOfThreads);
        return Observable.create(subscriber -> {
@@ -125,6 +153,13 @@ public class ObservableCrawler {
            }
        });
    }
+   private ObservableCrawler(Crawler crawler, int numOfThreads) {
+       this.crawler = crawler;
+       this.executorService = numOfThreads > 0 ?
+               Executors.newFixedThreadPool(numOfThreads, r -> new Thread(r, "Crawler-" + threadIdGenerator.incrementAndGet()))
+               : null;
+   }
+   
    private void processAsync(String url) {
           pendingTasks.incrementAndGet();
           executorService.submit(() -> {
@@ -162,6 +197,8 @@ executor service (thread pool). It is also worth mentioning that, as in the prev
 are use to allow for concurrent execution with no race conditions. However the rx library handles the synchronization 
 and thread scheduling for you behind the scenes and all you have to do is implement the onNext/ onError/ onCompleted 
 methods in a thread safe manner.
+Again no magic here each java thread is mapped directly to OS thread.
+The parallelism level in this program determined by the number of threads in the `ExecutorService`.
 
 Additional benefits of observable:
 * **Observables Are Composable:**  ReactiveX Observables are intended for composing flows and sequences of asynchronous
@@ -247,7 +284,7 @@ func main() {
         using 20 goroutines to process ["http://localhost:8080"]
         65535 links processed in 4.002921664s
 
-flag is a support for basic command-line flag parsing, here we declare an int flag, goroutines, with a default value 20 
+flag is the standard library for command-line flag parsing, here we declare an int flag, goroutines, with a default value 20 
 and a short description. Once all flags are declared, call flag.Parse() to execute the command-line parsing and then use
 the flag directly. for example, running 'web-crawler -goroutines=10 http://localhost:8080' will use only 10 goroutines 
 in the execution, if left unspecified the default value 20 will be used. 
@@ -259,6 +296,11 @@ You can explore the links.Extract method [here](https://github.com/Gigaspaces/co
 So, we can see that channels allows goroutines to synchronize without explicit locks or condition variables and the 
 performance of this implementation is significantly batter then the previous ones, that is because goroutines are much
 more efficient then java threads in memory consumption, setup,teardown and switching costs.
+
+In go goroutines are just logical threads and go mapped a group of logical threads into a group of OS threads.
+The number of OS threads used by this program is determined by the statement `runtime.GOMAXPROCS(runtime.NumCPU())` that set it to the number of CPU on the machine.
+Here the parallelism level is limit by size of the buffer in the channel `tokens`
+Go is a very small and simple language that is very easy to leary, it is has strong types but does not support generics, functions are first class object but the language does not encourage functional programming style.   
 
 ## The Node.js implementation
 
@@ -342,6 +384,11 @@ blocking (up to maxInProcessRequests) and the program can advanced in the meanti
 threaded and there for cannot compete with the other implementation who utilize the quad core on my computer to complete
 the parsing tasks simultaneously. However, in contrast to thread-based networking which are very difficult to use, Node 
 frees you from worries of dead-locks - there are no locks.
+
+Javascript is weak types language with C style statements but functions are first class, it is possible to write functional javascript.
+weak types means that it is hard to write a large program (need to hold all the type information in the head instead of using the compiler) and it is hard to maintained as well.
+This program run on one OS thread so there is no concurrency here, we defined the parallelism level to be the max number of on going request that allow at any time, this is controlled by the variable `maxInProcessRequests`
+    
 
 ## The Akka Implementation
 The Akka approach to handling concurrency is based on the Actor Model, the basics of this model is that every actor has 
@@ -461,6 +508,7 @@ The Akka implementation performs as good as the java implementations.
 The actors way of coding is a very simple approach to implement concurrent lock free application of any size, the level 
 of abstraction is very good as the concurrency configuration is completely decoupled from the logic and scaling is 
 done with ease.
+Because actor uses a thread only at the time it processing a message it can be seen as just data in memory (does not consume special os resources like stack and pointer in the process table), this property make actor very scalable, it is possible to create hundreds of thousands of them.   
 
 ## Bottom Line:
 
@@ -474,8 +522,8 @@ to consider when developing a concurrent application.
 | Basic java      |        Yes             |     Low           |      Hard      |     Low     |                     |
 | RxJava          |        Yes             |     Medium        |      Hard      |     Low     |                     |      
 | Go              |        Yes             |     High          |      Medium    |     Medium  |Hardware independent |         
-| Node.js         |        No              |     High          |      Easy      |     Medium  |                     |
-| Akka            |        Yes             |     High          |      Medium    |     High    |Location Transparency|
+| Node.js         |        No              |     High          |      Easy ? Types       |     Medium ? low |                     |
+| Akka            |        Yes             |     High          |      Medium ? Easy    |     High    |Location Transparency|
 
 While the java based implementations have good performance when you
 are developing a big system the complexity of shared local states and synchronization is hard to maintain and scaling your
