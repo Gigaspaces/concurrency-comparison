@@ -8,20 +8,20 @@ efficient code. By the nature of our distributed product the code, more often th
 keep up with all things concurrent and scalable we decided to write the same app in a variety of programming languages 
 and frameworks so we can compare and contrast the different implementations.
 
-Here are criteria that we choose to consider:
+Here are criteria that we chose to consider:
 
  * Multi-Core Utilization -- does the technology support Multi-Core Utilization without changing the program ? 
- * Abstraction Level -- _todo_
+ * Abstraction Level -- How much is the business logic code is separate and independent from concurrency related code? 
  * Easy To Master -- How much time does it take to learn this technology ?
  * Readability -- Does it easy to read others code? does it easy to read my code after a year ? 
  * Performance.
- * Additional Features -- Other goodies provided by this technology that does not fall into on of the above.
+ * Additional Features -- Other goodies provided by this technology that does not fall into one of the above.
 
 
 The program we chose to use as the comparator is a web crawler, its purpose is to traverse an html pages hierarchy and for every link (href) in a page, 
 fetch the page, extract its link and process them. The most potentially time consuming part of the execution is the remote http
 request and the parsing of the page and that is why this is the part we are paralleling.
-We execute each tests with parallelism level set to 1, 10 and 20.   
+We execute each test with parallelism level set to 1, 10 and 20.   
 
 ## The Testing Tool
 In order to test the results of each implementation we created the fake web tree - a go web server that generates a tree
@@ -108,9 +108,8 @@ public static void main(String[] args) throws InterruptedException {
 The java implementation is straightforward and dose not involve learning any new technology, however, readability is low.
 We have to use ConcurrentHashMap and AtomicInteger to avoid race conditions and to use a lock and synchronized blocks in
 order to write concurrent, thread safe code and every time we explicitly write synchronize pieces of code the chances of
-bugs increases.
-Java map java thread directly to OS thread.
-The parallelism level in this program determined by the number of threads in the `ExecutorService`.
+bugs increases. Java maps every java thread directly to an OS thread, so the parallelism level in this program is determined
+by the number of threads in the `ExecutorService`.
   
 
 ## The RxJava implementation
@@ -197,8 +196,8 @@ executor service (thread pool). It is also worth mentioning that, as in the prev
 are use to allow for concurrent execution with no race conditions. However the rx library handles the synchronization 
 and thread scheduling for you behind the scenes and all you have to do is implement the onNext/ onError/ onCompleted 
 methods in a thread safe manner.
-Again no magic here each java thread is mapped directly to OS thread.
-The parallelism level in this program determined by the number of threads in the `ExecutorService`.
+Again no magic here - each java thread is mapped directly to an OS thread and the parallelism level in determined by the
+number of threads in the `ExecutorService`.
 
 Additional benefits of observable:
 * **Observables Are Composable:**  ReactiveX Observables are intended for composing flows and sequences of asynchronous
@@ -209,7 +208,8 @@ sequences of values or even infinite streams.
 asynchronicity. 
 
 ## The Go implementation
-
+Go is a very small and simple language that is very easy to learn, it is has strong types but does not support generics.
+Functions are first class object but the language does not encourage functional programming style.
 Go is a general-purpose language developed by google and it was designed to get the most out of multi-core and networked
 machines. It is strongly typed and garbage-collected and has explicit support for concurrent programming like goroutines
 and channels. A goroutine is a lightweight thread managed by the Go runtime and channels are a typed conduit through 
@@ -293,14 +293,13 @@ of lists of links to process. it also serves as a countdown latch that determine
 simultaneously. The loop for link := range list receives values from the channel repeatedly until it is closed.
 You can explore the links.Extract method [here](https://github.com/Gigaspaces/concurrency-comparison/tree/master/golang/web-crawler/src/github.com/barakb/web-crawler/links)
 
+Goroutines are just logical threads and go maps a group of logical threads into a group of OS threads.
+The number of OS threads used by this program is determined by the statement `runtime.GOMAXPROCS(runtime.NumCPU())` that
+set it to the number of CPU's on the machine.
 So, we can see that channels allows goroutines to synchronize without explicit locks or condition variables and the 
 performance of this implementation is significantly batter then the previous ones, that is because goroutines are much
 more efficient then java threads in memory consumption, setup,teardown and switching costs.
-
-In go goroutines are just logical threads and go mapped a group of logical threads into a group of OS threads.
-The number of OS threads used by this program is determined by the statement `runtime.GOMAXPROCS(runtime.NumCPU())` that set it to the number of CPU on the machine.
-Here the parallelism level is limit by size of the buffer in the channel `tokens`
-Go is a very small and simple language that is very easy to leary, it is has strong types but does not support generics, functions are first class object but the language does not encourage functional programming style.   
+Here the parallelism level is limited by the size of the buffer in the channel `tokens`.    
 
 ## The Node.js implementation
 
@@ -385,9 +384,11 @@ threaded and there for cannot compete with the other implementation who utilize 
 the parsing tasks simultaneously. However, in contrast to thread-based networking which are very difficult to use, Node 
 frees you from worries of dead-locks - there are no locks.
 
-Javascript is weak types language with C style statements but functions are first class, it is possible to write functional javascript.
-weak types means that it is hard to write a large program (need to hold all the type information in the head instead of using the compiler) and it is hard to maintained as well.
-This program run on one OS thread so there is no concurrency here, we defined the parallelism level to be the max number of on going request that allow at any time, this is controlled by the variable `maxInProcessRequests`
+Javascript is a weak types language with C style statements but functions are first class objects and it is possible to 
+write functional javascript. Weak types means that it is hard to write a large program (need to hold all the type information
+in the head instead of using the compiler) and it is hard to maintained as well.
+This program runs on one OS thread so there is no concurrency here, we defined the parallelism level to be the max number
+of outgoing requests that is allowed at any time, this is controlled by the variable `maxInProcessRequests`.
     
 
 ## The Akka Implementation
@@ -508,7 +509,9 @@ The Akka implementation performs as good as the java implementations.
 The actors way of coding is a very simple approach to implement concurrent lock free application of any size, the level 
 of abstraction is very good as the concurrency configuration is completely decoupled from the logic and scaling is 
 done with ease.
-Because actor uses a thread only at the time it processing a message it can be seen as just data in memory (does not consume special os resources like stack and pointer in the process table), this property make actor very scalable, it is possible to create hundreds of thousands of them.   
+Because actor uses a thread only at the time it is processing a message it can be seen as just data in memory (does not 
+consume special os resources like stack and pointer in the process table), this property make actor very scalable, it is
+possible to create hundreds of thousands of them.   
 
 ## Bottom Line:
 
@@ -522,8 +525,8 @@ to consider when developing a concurrent application.
 | Basic java      |        Yes             |     Low           |      Hard      |     Low     |                     |
 | RxJava          |        Yes             |     Medium        |      Hard      |     Low     |                     |      
 | Go              |        Yes             |     High          |      Medium    |     Medium  |Hardware independent |         
-| Node.js         |        No              |     High          |      Easy ? Types       |     Medium ? low |                     |
-| Akka            |        Yes             |     High          |      Medium ? Easy    |     High    |Location Transparency|
+| Node.js         |        No              |     High          |      Medium    |     low     |                     |
+| Akka            |        Yes             |     High          |      Medium    |     High    |Location Transparency|
 
 While the java based implementations have good performance when you
 are developing a big system the complexity of shared local states and synchronization is hard to maintain and scaling your
